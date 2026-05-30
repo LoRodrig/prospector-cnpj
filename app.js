@@ -5,7 +5,7 @@
     throw new Error('Configure APP_CONFIG em config.js a partir de config.example.js.');
   }
 
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   /* â”€â”€â”€ STATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   let allData       = [];
@@ -71,7 +71,7 @@
   }
 
   async function carregarCnaes() {
-    const { data, error } = await supabaseClient
+    const { data, error } = await dbClient
       .from('empresas')
       .select('cnae_principal, descricao_cnae')
       .not('cnae_principal', 'is', null)
@@ -218,7 +218,7 @@
   }
 
   async function buscarPorRaio(geo, raio, limite, cnae, cidade, uf) {
-    let { data, error } = await supabaseClient.rpc('buscar_empresas_raio', {
+    let { data, error } = await dbClient.rpc('buscar_empresas_raio', {
       lat_input:         geo.lat,
       lon_input:         geo.lon,
       raio_km:           raio,
@@ -227,7 +227,7 @@
     });
 
     if (error && error.message && error.message.includes('Could not find the function')) {
-      const fallback = await supabaseClient.rpc('buscar_empresas_raio', {
+      const fallback = await dbClient.rpc('buscar_empresas_raio', {
         lat_input:         geo.lat,
         lon_input:         geo.lon,
         raio_km:           raio,
@@ -249,7 +249,7 @@
   }
 
   async function buscarPorCidade(cidade, uf, cnae, limite) {
-    let query = supabaseClient
+    let query = dbClient
       .from('empresas')
       .select('cnpj,razao_social,nome_fantasia,cnae_principal,descricao_cnae,cidade,uf,bairro,logradouro,numero,cep,telefone,email,latitude,longitude')
       .eq('cidade', normalizarCidade(cidade))
