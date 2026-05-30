@@ -1,17 +1,17 @@
 # 🔍 Prospector CNPJ
 
-[![ETL Mensal](https://github.com/SEU_USUARIO/prospector-cnpj/actions/workflows/etl_mensal.yml/badge.svg)](https://github.com/SEU_USUARIO/prospector-cnpj/actions/workflows/etl_mensal.yml)
+[![ETL Mensal](https://github.com/LoRodrig/prospector-cnpj/actions/workflows/etl_mensal.yml/badge.svg)](https://github.com/LoRodrig/prospector-cnpj/actions/workflows/etl_mensal.yml)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostGIS-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Leaflet](https://img.shields.io/badge/Leaflet-1.9-199900?logo=leaflet&logoColor=white)](https://leafletjs.com/)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-222222?logo=github&logoColor=white)](https://SEU_USUARIO.github.io/prospector-cnpj/)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-222222?logo=github&logoColor=white)](https://lorodrig.github.io/prospector-cnpj/)
 [![Dados Abertos](https://img.shields.io/badge/Dados-Receita%20Federal-009C3B)](https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj)
 [![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)](LICENSE)
 
 **Pipeline de Engenharia de Dados** que coleta empresas dos dados abertos da Receita Federal, armazena em PostgreSQL com extensão PostGIS no Supabase e disponibiliza consulta geoespacial por raio de distância via interface web.
 
-> 🌐 **[Ver demo ao vivo →](https://SEU_USUARIO.github.io/prospector-cnpj/)**
+> 🌐 **[Ver demo ao vivo →](https://lorodrig.github.io/prospector-cnpj/)**
 
 ![Demo do Prospector CNPJ](docs/demo.gif)
 
@@ -64,7 +64,7 @@
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-> Para um diagrama visual, veja [`docs/arquitetura.png`](docs/arquitetura.png).
+> Diagrama visual: [`docs/arquitetura.svg`](docs/arquitetura.svg)
 
 ---
 
@@ -79,28 +79,23 @@ prospector-cnpj/
 ├── etl/
 │   ├── cnpjs_receita.py         # Pipeline principal: download → parse → Supabase
 │   ├── geocodificar_supabase.py # Geocodificação de endereços via Nominatim
-│   └── requirements.txt         # Dependências Python (requests, psycopg2-binary)
+│   ├── .env.example             # Template de credenciais (copiar para .env)
+│   └── requirements.txt         # Dependências Python
 │
 ├── sql/
-│   ├── schema.sql               # DDL: tabela empresas + extensão PostGIS + índice
-│   └── functions.sql            # Função buscar_empresas_raio (PostGIS RPC)
-│
-├── frontend/
-│   ├── index.html               # Estrutura da página
-│   ├── app.js                   # Lógica: busca, mapa, gráficos, CSV
-│   ├── styles.css               # Estilos (dark theme, grid, componentes)
-│   ├── config.js                # ⚠ NÃO versionar — criado a partir de config.example.js
-│   └── config.example.js        # Template de configuração (commitar este)
+│   ├── schema.sql               # DDL: tabela empresas + PostGIS + índices
+│   └── functions.sql            # Função buscar_empresas_raio (RPC)
 │
 ├── docs/
 │   ├── demo.gif                 # GIF animado para o README
-│   └── arquitetura.png          # Diagrama de arquitetura
+│   └── arquitetura.svg          # Diagrama de arquitetura
 │
-├── database/
-│   └── sample_data.csv          # ~200 empresas de exemplo para demo
-│
+├── index.html                   # Frontend — estrutura da página
+├── app.js                       # Frontend — busca, mapa, gráficos, CSV
+├── styles.css                   # Frontend — dark theme
+├── config.example.js            # Template de config (commitar este)
+├── config.js                    # ⚠ NÃO versionar — criar a partir do example
 ├── .gitignore
-├── LICENSE
 └── README.md
 ```
 
@@ -111,34 +106,32 @@ prospector-cnpj/
 ### Pré-requisitos
 - Python 3.11+
 - Conta no [Supabase](https://supabase.com/) (plano gratuito funciona)
-- PostgreSQL com extensão PostGIS habilitada no Supabase
+- PostGIS habilitado no projeto Supabase
 
 ### Passos
 
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/SEU_USUARIO/prospector-cnpj.git
+git clone https://github.com/LoRodrig/prospector-cnpj.git
 cd prospector-cnpj
 
 # 2. Instale as dependências Python
 pip install -r etl/requirements.txt
 
 # 3. Configure as credenciais
-cp frontend/config.example.js frontend/config.js
-# Edite frontend/config.js com sua SUPABASE_URL e SUPABASE_ANON_KEY
+cp config.example.js config.js
+# Edite config.js com sua SUPABASE_URL e SUPABASE_ANON_KEY
 
 cp etl/.env.example etl/.env
-# Edite etl/.env com suas credenciais do banco
+# Edite etl/.env com as credenciais do banco
 
-# 4. Execute o ETL (baixa ~7GB da Receita, processa e sobe para o Supabase)
-cd etl
-python cnpjs_receita.py
+# 4. Execute o ETL
+cd etl && python cnpjs_receita.py
 
 # 5. Geocodifique os endereços
 python geocodificar_supabase.py --limite 1000
 
-# 6. Abra o frontend
-# Basta abrir frontend/index.html no navegador, ou usar Live Server no VS Code
+# 6. Abra index.html no navegador (ou use Live Server no VS Code)
 ```
 
 ---
@@ -146,18 +139,17 @@ python geocodificar_supabase.py --limite 1000
 ## ⚙️ Configuração do Supabase
 
 ### 1. Habilitar PostGIS
-No SQL Editor do Supabase:
 ```sql
 CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 
 ### 2. Criar a tabela
-Execute o conteúdo de [`sql/schema.sql`](sql/schema.sql).
+Execute [`sql/schema.sql`](sql/schema.sql).
 
 ### 3. Criar a função RPC
-Execute o conteúdo de [`sql/functions.sql`](sql/functions.sql).
+Execute [`sql/functions.sql`](sql/functions.sql).
 
-### 4. Variáveis de ambiente necessárias (arquivo `etl/.env`)
+### 4. Variáveis de ambiente (`etl/.env`)
 ```env
 SUPABASE_HOST=aws-1-us-west-1.pooler.supabase.com
 SUPABASE_PORT=6543
@@ -174,9 +166,8 @@ NOMINATIM_EMAIL=seu@email.com
 
 O workflow [`.github/workflows/etl_mensal.yml`](.github/workflows/etl_mensal.yml) executa automaticamente no **dia 15 de cada mês** e pode ser acionado manualmente a qualquer momento.
 
-### Configurar os Secrets no GitHub
-
-Acesse: **Settings → Secrets and variables → Actions → New repository secret**
+### Configurar os Secrets
+Settings → Secrets and variables → Actions → New repository secret
 
 | Secret | Valor |
 |--------|-------|
@@ -186,11 +177,7 @@ Acesse: **Settings → Secrets and variables → Actions → New repository secr
 | `SUPABASE_USER` | `postgres` |
 | `SUPABASE_PASSWORD` | Senha do banco |
 | `SUPABASE_PROJECT_REF` | Project ref (aparece na URL do Supabase) |
-| `NOMINATIM_EMAIL` | Seu e-mail (exigido pela política do Nominatim) |
-
-### Executar manualmente
-
-Na aba **Actions** → **ETL Mensal — Receita Federal** → **Run workflow**.
+| `NOMINATIM_EMAIL` | Seu e-mail (política do Nominatim) |
 
 ---
 
@@ -214,10 +201,9 @@ CREATE TABLE empresas (
   email           TEXT,
   latitude        DOUBLE PRECISION,
   longitude       DOUBLE PRECISION,
-  geom            GEOGRAPHY(POINT, 4326)  -- PostGIS, indexado com GIST
+  geom            GEOGRAPHY(POINT, 4326)
 );
 
--- Índice espacial para consultas de raio
 CREATE INDEX idx_empresas_geom ON empresas USING GIST (geom);
 ```
 
@@ -241,9 +227,9 @@ CREATE INDEX idx_empresas_geom ON empresas USING GIST (geom);
 |--------|-----------|
 | ETL | Python 3.11, requests, psycopg2 |
 | Banco de dados | PostgreSQL 16 + PostGIS |
-| BaaS | Supabase (hosting + API + autenticação) |
+| BaaS | Supabase |
 | Geocodificação | Nominatim / OpenStreetMap |
-| Frontend | HTML5, CSS3, JavaScript (vanilla) |
+| Frontend | HTML5, CSS3, JavaScript vanilla |
 | Mapa | Leaflet.js |
 | Gráficos | Chart.js |
 | CI/CD | GitHub Actions |
@@ -253,14 +239,14 @@ CREATE INDEX idx_empresas_geom ON empresas USING GIST (geom);
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+Este projeto está sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
 
-Os dados são públicos e disponibilizados pela Receita Federal do Brasil sob [dados.gov.br](https://dados.gov.br/).
+Dados públicos disponibilizados pela Receita Federal do Brasil via [dados.gov.br](https://dados.gov.br/).
 
 ---
 
 <p align="center">
-  Feito com ☕ e dados abertos · 
-  <a href="https://SEU_USUARIO.github.io/prospector-cnpj/">Ver demo</a> ·
-  <a href="https://github.com/SEU_USUARIO/prospector-cnpj/issues">Reportar bug</a>
+  Feito com ☕ e dados abertos ·
+  <a href="https://lorodrig.github.io/prospector-cnpj/">Ver demo</a> ·
+  <a href="https://github.com/LoRodrig/prospector-cnpj/issues">Reportar bug</a>
 </p>
