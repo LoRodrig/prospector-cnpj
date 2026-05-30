@@ -4,10 +4,13 @@
   'use strict';
 
   const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG || {};
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error('Configure APP_CONFIG em config.js a partir de config.example.js.');
-  }
-  const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const configOk = Boolean(
+    SUPABASE_URL &&
+    SUPABASE_ANON_KEY &&
+    !String(SUPABASE_URL).includes('SEU_PROJECT_REF') &&
+    !String(SUPABASE_ANON_KEY).includes('SUA_SUPABASE')
+  );
+  const dbClient = configOk ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
   /* â”€â”€â”€ STATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   let allData       = [];
@@ -39,6 +42,12 @@
     document.getElementById('statusText').textContent = msg;
     const dot = document.getElementById('statusDot');
     dot.className = 'status-dot ' + (tipo === 'loading' ? '' : tipo);
+  }
+
+  function supabasePronto() {
+    if (dbClient) return true;
+    setStatus('Erro: configure config.public.js com SUPABASE_URL e SUPABASE_ANON_KEY.', 'err');
+    return false;
   }
 
   function initMap() {
@@ -73,6 +82,7 @@
   }
 
   async function carregarCnaes() {
+    if (!dbClient) return;
     const { data, error } = await dbClient
       .from('empresas')
       .select('cnae_principal, descricao_cnae')
@@ -115,6 +125,7 @@
 
   /* â”€â”€â”€ BUSCA PRINCIPAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   async function buscarEmpresas() {
+    if (!supabasePronto()) return;
     const cidade = document.getElementById('cidade').value.trim();
     const uf     = document.getElementById('uf').value.trim();
     const raio   = Number(document.getElementById('raio').value);
