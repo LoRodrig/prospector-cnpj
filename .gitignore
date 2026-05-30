@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 geocode_cache.json
 config.js
+config.public.js
