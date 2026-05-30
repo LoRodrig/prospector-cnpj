@@ -1,10 +1,12 @@
 ﻿
   /* â”€â”€â”€ CONFIG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+(() => {
+  'use strict';
+
   const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG || {};
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error('Configure APP_CONFIG em config.js a partir de config.example.js.');
   }
-
   const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   /* â”€â”€â”€ STATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -650,4 +652,17 @@
     setStatus('Aguardando busca...', 'idle');
   }
 
+  Object.assign(window, {
+    baixarCSV,
+    buscarEmpresas,
+    copiarTexto,
+    fecharDetalhe,
+    filtrarTabela,
+    focarEmpresa,
+    goPage,
+    limpar,
+    setFiltro,
+    sortBy
+  });
+})();
 
