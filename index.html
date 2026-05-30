@@ -1,0 +1,201 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prospector CNPJ | Inteligência Comercial</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="styles.css?v=20260530">
+</head>
+
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo-block">
+      <p class="logo-eyebrow">// Dados Abertos · Receita Federal · Supabase</p>
+      <h1>Prospector CNPJ</h1>
+    </div>
+    <div class="header-meta">
+      <p>Pipeline de Engenharia de Dados.<br>
+         Consulta por geolocalização com PostGIS.<br>
+         Exportação CSV em um clique.</p>
+    </div>
+  </header>
+
+  <!-- SEARCH PANEL -->
+  <section class="search-panel">
+    <p class="panel-title">// parâmetros de busca</p>
+
+    <div class="form-grid">
+      <div class="field">
+        <label>Cidade</label>
+        <input id="cidade" type="text" value="Maringá" placeholder="Ex: Maringá" />
+      </div>
+      <div class="field">
+        <label>UF</label>
+        <select id="uf">
+          <option value="AC">AC</option><option value="AL">AL</option>
+          <option value="AM">AM</option><option value="AP">AP</option>
+          <option value="BA">BA</option><option value="CE">CE</option>
+          <option value="DF">DF</option><option value="ES">ES</option>
+          <option value="GO">GO</option><option value="MA">MA</option>
+          <option value="MG">MG</option><option value="MS">MS</option>
+          <option value="MT">MT</option><option value="PA">PA</option>
+          <option value="PB">PB</option><option value="PE">PE</option>
+          <option value="PI">PI</option><option value="PR" selected>PR</option>
+          <option value="RJ">RJ</option><option value="RN">RN</option>
+          <option value="RO">RO</option><option value="RR">RR</option>
+          <option value="RS">RS</option><option value="SC">SC</option>
+          <option value="SE">SE</option><option value="SP">SP</option>
+          <option value="TO">TO</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Raio (km)</label>
+        <input id="raio" type="number" value="15" min="1" max="200" />
+      </div>
+      <div class="field">
+        <label>Limite</label>
+        <input id="limite" type="number" value="500" min="10" max="5000" />
+      </div>
+      <div class="field">
+        <label>CNAE (opcional)</label>
+        <input id="cnae" type="text" list="cnaeOptions" placeholder="Código ou atividade" autocomplete="off" />
+        <datalist id="cnaeOptions"></datalist>
+      </div>
+    </div>
+
+    <div class="filter-row">
+      <span class="filter-label">FILTRAR:</span>
+      <button class="chip active" id="chipTodos"    onclick="setFiltro('todos')">Todos</button>
+      <button class="chip"        id="chipEmail"    onclick="setFiltro('email')">Com e-mail</button>
+      <button class="chip"        id="chipTelefone" onclick="setFiltro('telefone')">Com telefone</button>
+      <button class="chip"        id="chipAmbos"    onclick="setFiltro('ambos')">E-mail + Telefone</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="btnBuscar" onclick="buscarEmpresas()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Buscar empresas
+      </button>
+      <button class="btn btn-outline" onclick="baixarCSV()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Exportar CSV
+      </button>
+      <button class="btn btn-outline" onclick="limpar()">Limpar</button>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot idle" id="statusDot"></div>
+      <span id="statusText">Aguardando busca...</span>
+    </div>
+  </section>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-val" id="kpiTotal">—</div>
+      <div class="kpi-label">Empresas encontradas</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kpiEmail">—</div>
+      <div class="kpi-label">Com e-mail</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kpiTel">—</div>
+      <div class="kpi-label">Com telefone</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kpiDist">—</div>
+      <div class="kpi-label">Distância média</div>
+    </div>
+  </div>
+
+  <!-- MAP + CHART -->
+  <section class="insights-grid">
+    <div class="insight-panel">
+      <div class="insight-header">
+        <span>// mapa por CNAE</span>
+        <div class="legend" id="mapLegend"></div>
+      </div>
+      <div id="map"></div>
+    </div>
+    <div class="insight-panel">
+      <div class="insight-header">
+        <span>// top 10 CNAEs</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="cnaeChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="table-section">
+    <div class="table-header">
+      <span class="table-title">// resultados</span>
+      <input id="searchFilter" type="text" placeholder="Filtrar empresa, atividade, CNAE..." oninput="filtrarTabela()" />
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('cnpj')">CNPJ<span class="sort-icon"></span></th>
+            <th onclick="sortBy('razao_social')">Razão Social<span class="sort-icon"></span></th>
+            <th onclick="sortBy('nome_fantasia')">Fantasia<span class="sort-icon"></span></th>
+            <th onclick="sortBy('cnae_principal')">CNAE<span class="sort-icon"></span></th>
+            <th onclick="sortBy('descricao_cnae')">Atividade<span class="sort-icon"></span></th>
+            <th onclick="sortBy('cidade')">Cidade<span class="sort-icon"></span></th>
+            <th>UF</th>
+            <th>Telefone</th>
+            <th>E-mail</th>
+            <th onclick="sortBy('distancia_km')">Distância<span class="sort-icon"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr class="empty-row"><td colspan="10">Faça uma busca para visualizar os resultados.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="paginacao"></div>
+  </section>
+
+</div>
+
+<aside class="detail-drawer" id="detailDrawer" aria-hidden="true">
+  <div class="detail-panel">
+    <div class="detail-head">
+      <span>// empresa selecionada</span>
+      <button class="detail-close" type="button" onclick="fecharDetalhe()">×</button>
+    </div>
+    <div class="detail-body" id="detailBody">
+      <p class="detail-empty">Selecione uma empresa na tabela ou no mapa.</p>
+    </div>
+  </div>
+</aside>
+
+<footer>
+  Dados: <a href="https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj" target="_blank">Receita Federal</a>
+  &nbsp;·&nbsp;
+  Storage: <a href="https://supabase.com" target="_blank">Supabase + PostGIS</a>
+  &nbsp;·&nbsp;
+  Geocodificação: <a href="https://nominatim.openstreetmap.org" target="_blank">Nominatim / OSM</a>
+</footer>
+
+  <script src="config.js?v=20260530"></script>
+  <script src="app.js?v=20260530"></script>
+</body>
+</html>
+
