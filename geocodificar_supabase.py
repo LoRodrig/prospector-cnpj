@@ -5,6 +5,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from datetime import datetime, timedelta
 
 import requests
 
@@ -17,6 +18,14 @@ except ImportError:
 BASE_DIR = Path(__file__).resolve().parent
 CACHE_DIR = Path(os.getenv("LOCALAPPDATA", BASE_DIR)) / "prospector_cnpj"
 CACHE_FILE = CACHE_DIR / "geocode_cache.json"
+
+
+def agora():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def formatar_duracao(segundos):
+    return str(timedelta(seconds=int(segundos)))
 
 CIDADES_PADRAO = [
     "MARINGA",
@@ -267,6 +276,10 @@ def main():
     processados = 0
     lote_atual = 0
     ids_tentados = set()
+    inicio = time.monotonic()
+    inicio_relogio = agora()
+
+    print(f"Inicio: {inicio_relogio}")
 
     try:
         while True:
@@ -285,7 +298,8 @@ def main():
                 break
 
             lote_atual += 1
-            print(f"\nLote {lote_atual}: {len(rows)} pendentes")
+            inicio_lote = time.monotonic()
+            print(f"\n[{agora()}] Lote {lote_atual}: {len(rows)} pendentes")
 
             for row in rows:
                 empresa_id, cnpj, cidade, uf, bairro, logradouro, numero, cep = row
@@ -322,19 +336,32 @@ def main():
 
                 processados += 1
                 if processados % 25 == 0:
+                    decorrido = time.monotonic() - inicio
+                    media = decorrido / processados if processados else 0
                     print(
                         f"Processados: {processados} | "
-                        f"Tentativas: {tentativas} | Atualizados: {atualizados}"
+                        f"Tentativas: {tentativas} | Atualizados: {atualizados} | "
+                        f"Decorrido: {formatar_duracao(decorrido)} | "
+                        f"Media: {media:.1f}s/reg"
                     )
 
             salvar_cache(cache)
+            duracao_lote = time.monotonic() - inicio_lote
+            print(
+                f"[{agora()}] Fim do lote {lote_atual} | "
+                f"Duracao lote: {formatar_duracao(duracao_lote)} | "
+                f"Total decorrido: {formatar_duracao(time.monotonic() - inicio)}"
+            )
             if args.pausa_lote:
                 time.sleep(args.pausa_lote)
 
         salvar_cache(cache)
+        duracao_total = time.monotonic() - inicio
         print(
             f"Finalizado. Lotes: {lote_atual} | Processados: {processados} | "
-            f"Tentativas: {tentativas} | Atualizados: {atualizados}"
+            f"Tentativas: {tentativas} | Atualizados: {atualizados} | "
+            f"Inicio: {inicio_relogio} | Fim: {agora()} | "
+            f"Duracao total: {formatar_duracao(duracao_total)}"
         )
 
     finally:
