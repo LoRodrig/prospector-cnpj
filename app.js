@@ -19,7 +19,8 @@
   let sortCol       = 'distancia_km';
   let sortDir       = 'asc';
   let page          = 1;
-  const PAGE_SIZE   = 50;
+  const DESKTOP_PAGE_SIZE = 50;
+  const MOBILE_PAGE_SIZE = 15;
   let map;
   let markerLayer;
   let selectedLayer;
@@ -171,7 +172,7 @@
       setStatus(
         fallbackCidade
           ? `Concluído — ${allData.length} empresas por cidade. Geocodifique para mapa/raio.`
-          : `Concluído — ${allData.length} empresas encontradas.`,
+          : `Concluído — ${allData.length} empresas encontradas.${allData.some(coordenadaAproximada) ? ' Alguns pontos são aproximados.' : ''}`,
         'ok'
       );
 
@@ -312,7 +313,8 @@
   /* â”€â”€â”€ RENDER TABELA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   function renderTabela(dados) {
     const tbody = document.getElementById('tbody');
-    const slice = dados.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+    const pageSize = getPageSize();
+    const slice = dados.slice((page-1)*pageSize, page*pageSize);
 
     if (!slice.length) {
       tbody.innerHTML = `<tr class="empty-row"><td colspan="10">Nenhum resultado para os filtros selecionados.</td></tr>`;
@@ -341,7 +343,7 @@
 
   /* â”€â”€â”€ PAGINAÇÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   function renderPaginacao(total) {
-    const pages = Math.ceil(total / PAGE_SIZE);
+    const pages = Math.ceil(total / getPageSize());
     const pag   = document.getElementById('paginacao');
     if (pages <= 1) { pag.innerHTML = ''; return; }
 
@@ -356,6 +358,10 @@
     if (page < pages) html += `<button class="page-btn" onclick="goPage(${page+1})">→</button>`;
     html += `<span class="page-info">${total} resultados</span>`;
     pag.innerHTML = html;
+  }
+
+  function getPageSize() {
+    return window.matchMedia('(max-width: 720px)').matches ? MOBILE_PAGE_SIZE : DESKTOP_PAGE_SIZE;
   }
 
   function goPage(n) { page = n; filtrarTabela(); }
@@ -418,9 +424,23 @@
     return `<span class="geo-badge ${info.classe}" title="${escapeHtml(info.origem)}">${escapeHtml(info.label)}</span>`;
   }
 
-  function markerStylePorGeocoding(row, color) {
+  function coordenadaAproximada(row) {
     const nivel = String(row.geocoding_nivel || '').toLowerCase();
-    const aproximado = ['cep', 'bairro', 'cidade', 'temporario'].includes(nivel);
+    return ['cep', 'bairro', 'cidade', 'temporario'].includes(nivel);
+  }
+
+  function coordenadaVisual(row, lat, lon) {
+    if (!coordenadaAproximada(row)) return [lat, lon];
+    const chave = String(row.cnpj || row.razao_social || `${lat},${lon}`);
+    let hash = 0;
+    for (let i = 0; i < chave.length; i++) hash = ((hash << 5) - hash + chave.charCodeAt(i)) | 0;
+    const angulo = (Math.abs(hash) % 360) * Math.PI / 180;
+    const raio = 0.00025 + ((Math.abs(hash) % 7) * 0.00008);
+    return [lat + Math.sin(angulo) * raio, lon + Math.cos(angulo) * raio];
+  }
+
+  function markerStylePorGeocoding(row, color) {
+    const aproximado = coordenadaAproximada(row);
     return {
       radius: aproximado ? 5 : 6,
       color: aproximado ? '#e2e8f0' : color,
@@ -469,11 +489,13 @@
     }
 
     const bounds = [];
+    const boundsConfiaveis = [];
     comCoordenadas.forEach(row => {
       const lat = Number(row.latitude);
       const lon = Number(row.longitude);
+      const [markerLat, markerLon] = coordenadaVisual(row, lat, lon);
       const color = colorForCnae(getCnaeKey(row), top);
-      const marker = L.circleMarker([lat, lon], markerStylePorGeocoding(row, color)).bindPopup(`
+      const marker = L.circleMarker([markerLat, markerLon], markerStylePorGeocoding(row, color)).bindPopup(`
         <strong>${escapeHtml(row.nome_fantasia || row.razao_social || 'Empresa')}</strong><br>
         ${geocodingBadge(row)}<br>
         ${escapeHtml(row.descricao_cnae || row.cnae_principal || '')}<br>
@@ -482,11 +504,20 @@
       `);
       marker.on('click', () => abrirDetalhe(row));
       markerLayer.addLayer(marker);
-      bounds.push([lat, lon]);
+      bounds.push([markerLat, markerLon]);
+      if (!coordenadaAproximada(row)) boundsConfiaveis.push([markerLat, markerLon]);
     });
 
-    if (bounds.length === 1) map.setView(bounds[0], 15);
-    else map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
+    const fitBounds = boundsConfiaveis.length ? boundsConfiaveis : bounds;
+    const coordsUnicas = new Set(fitBounds.map(([lat, lon]) => `${lat.toFixed(5)},${lon.toFixed(5)}`));
+    const temConfiaveis = boundsConfiaveis.length > 0;
+
+    if (fitBounds.length === 1 || coordsUnicas.size === 1) {
+      const [lat, lon] = fitBounds[0];
+      map.setView([lat, lon], temConfiaveis ? 15 : 12);
+    } else {
+      map.fitBounds(fitBounds, { padding: [28, 28], maxZoom: temConfiaveis ? 15 : 12 });
+    }
   }
 
   async function focarEmpresa(cnpj) {

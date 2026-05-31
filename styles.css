@@ -893,8 +893,8 @@
 
       tbody {
         display: grid;
-        gap: 10px;
-        padding: 10px;
+        gap: 8px;
+        padding: 8px;
       }
 
       tbody tr {
@@ -902,38 +902,64 @@
         border-radius: 12px;
         background: rgba(255,255,255,.025);
         overflow: hidden;
+        padding: 10px;
       }
 
       tbody td {
-        display: grid;
-        grid-template-columns: 104px minmax(0, 1fr);
-        gap: 10px;
+        display: block;
         align-items: start;
         max-width: none;
-        padding: 8px 10px;
-        border-top: 1px solid rgba(148,163,184,.07);
+        padding: 0;
+        border-top: 0;
         white-space: normal !important;
         overflow: visible;
         text-overflow: clip;
         overflow-wrap: anywhere;
       }
 
-      tbody td:first-child {
-        border-top: 0;
-      }
-
       tbody td::before {
-        content: attr(data-label);
-        color: var(--muted);
-        font-family: 'DM Mono', monospace;
-        font-size: 9px;
-        letter-spacing: .08em;
-        text-transform: uppercase;
+        display: none;
       }
 
+      th:nth-child(1), td:nth-child(1),
       th:nth-child(3), td:nth-child(3),
+      th:nth-child(4), td:nth-child(4),
+      th:nth-child(6), td:nth-child(6),
       th:nth-child(7), td:nth-child(7) {
         display: none;
+      }
+
+      tbody td:nth-child(2) {
+        font-size: 12px;
+        line-height: 1.35;
+        color: var(--text);
+        margin-bottom: 6px;
+      }
+
+      tbody td:nth-child(5) {
+        font-size: 11px;
+        line-height: 1.35;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      tbody td:nth-child(8),
+      tbody td:nth-child(9),
+      tbody td:nth-child(10) {
+        display: inline-flex;
+        width: auto;
+        max-width: 100%;
+        margin: 2px 4px 0 0;
+        vertical-align: top;
+      }
+
+      tbody tr.empty-row {
+        padding: 14px;
+      }
+
+      tbody tr.empty-row td {
+        display: block;
+        color: var(--muted);
       }
 
       #map {
@@ -971,8 +997,5 @@
         text-align: center;
       }
 
-      tbody td {
-        grid-template-columns: 92px minmax(0, 1fr);
-        font-size: 11px;
-      }
+      tbody td { font-size: 11px; }
     }
