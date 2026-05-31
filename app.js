@@ -1,5 +1,4 @@
-﻿
-  /* â”€â”€â”€ CONFIG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+﻿/* â”€â”€â”€ CONFIG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 (() => {
   'use strict';
 
@@ -29,6 +28,7 @@
   let mapFocusLocked = false;
   let cnaeCatalog = [];
   const CNAE_COLORS = ['#38bdf8','#22c55e','#f59e0b','#f472b6','#a78bfa','#fb7185','#14b8a6','#eab308','#60a5fa','#f97316'];
+  const MAP_MARKER_LIMIT = 3000;
 
   document.addEventListener('DOMContentLoaded', () => {
     initMap();
@@ -53,7 +53,10 @@
   }
 
   function initMap() {
-    map = L.map('map', { zoomControl: true }).setView([-23.4205, -51.9331], 11);
+    map = L.map('map', {
+      zoomControl: true,
+      renderer: L.canvas({ padding: 0.35 })
+    }).setView([-23.4205, -51.9331], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
@@ -336,7 +339,7 @@
         <td data-label="E-mail" title="${r.email || ''}">${r.email
           ? `<span class="badge badge-email">${r.email}</span>`
           : `<span class="badge badge-none">—</span>`}</td>
-        <td data-label="Mapa">${r.distancia_km != null ? `<span class="dist-pill">${r.distancia_km} km</span>` : ''}${geocodingBadge(r)}</td>
+        <td data-label="Geo" class="geo-cell">${r.distancia_km != null ? `<span class="dist-pill">${r.distancia_km} km</span>` : ''}${geocodingBadge(r)}</td>
       </tr>
     `).join('');
   }
@@ -429,6 +432,10 @@
     return ['cep', 'bairro', 'cidade', 'temporario'].includes(nivel);
   }
 
+  function chaveCoordenada(lat, lon) {
+    return `${Number(lat).toFixed(5)},${Number(lon).toFixed(5)}`;
+  }
+
   function coordenadaVisual(row, lat, lon, repeticoes = 1) {
     if (!coordenadaAproximada(row) && repeticoes <= 1) return [lat, lon];
     const chave = String(row.cnpj || row.razao_social || `${lat},${lon}`);
@@ -445,11 +452,12 @@
   function markerStylePorGeocoding(row, color) {
     const aproximado = coordenadaAproximada(row);
     return {
-      radius: aproximado ? 5 : 6,
-      color: aproximado ? '#e2e8f0' : color,
+      radius: aproximado ? 3.5 : 6,
+      color: aproximado ? color : '#ffffff',
       fillColor: color,
-      fillOpacity: aproximado ? .45 : .82,
-      weight: aproximado ? 2 : 1
+      fillOpacity: aproximado ? .32 : .88,
+      opacity: aproximado ? .45 : .95,
+      weight: aproximado ? 0 : 1.5
     };
   }
 
@@ -473,19 +481,23 @@
 
     const comCoordenadas = dados
       .filter(row => Number.isFinite(Number(row.latitude)) && Number.isFinite(Number(row.longitude)))
-      .slice(0, 1000);
+      .slice(0, MAP_MARKER_LIMIT);
 
     const top = cnaeTop(comCoordenadas, 10);
     const legend = document.getElementById('mapLegend');
-    legend.innerHTML = top.slice(0, 5).map((item, idx) => `
+    const legendaCnaes = top.slice(0, 5).map((item, idx) => `
       <span class="legend-item" title="${escapeHtml(item.label)}">
         <span class="legend-dot" style="background:${CNAE_COLORS[idx]}"></span>
         ${escapeHtml(item.label.length > 20 ? item.label.slice(0, 20) + '...' : item.label)}
       </span>
     `).join('');
+    legend.innerHTML = `
+      ${legendaCnaes}
+      <span class="legend-item legend-quality"><span class="legend-dot legend-dot-exact"></span>exato</span>
+      <span class="legend-item legend-quality"><span class="legend-dot legend-dot-approx"></span>aprox.</span>
+    `;
 
     if (mapFocusLocked) return;
-
     if (!comCoordenadas.length) {
       if (lastGeo) map.setView([lastGeo.lat, lastGeo.lon], 12);
       return;
@@ -493,20 +505,23 @@
 
     const repeticoesPorCoordenada = new Map();
     comCoordenadas.forEach(row => {
-      const chave = `${Number(row.latitude).toFixed(5)},${Number(row.longitude).toFixed(5)}`;
+      const chave = chaveCoordenada(row.latitude, row.longitude);
       repeticoesPorCoordenada.set(chave, (repeticoesPorCoordenada.get(chave) || 0) + 1);
     });
 
-    const bounds = [];
+    const ordenados = [...comCoordenadas].sort((a, b) =>
+      Number(coordenadaAproximada(b)) - Number(coordenadaAproximada(a))
+    );
+
+    const fitBounds = [];
     const boundsConfiaveis = [];
-    comCoordenadas.forEach(row => {
+    ordenados.forEach(row => {
       const lat = Number(row.latitude);
       const lon = Number(row.longitude);
-      const chave = `${lat.toFixed(5)},${lon.toFixed(5)}`;
-      const repeticoes = repeticoesPorCoordenada.get(chave) || 1;
-      const [markerLat, markerLon] = coordenadaVisual(row, lat, lon, repeticoes);
+      const repeticoes = repeticoesPorCoordenada.get(chaveCoordenada(lat, lon)) || 1;
+      const [mLat, mLon] = coordenadaVisual(row, lat, lon, repeticoes);
       const color = colorForCnae(getCnaeKey(row), top);
-      const marker = L.circleMarker([markerLat, markerLon], markerStylePorGeocoding(row, color)).bindPopup(`
+      const marker = L.circleMarker([mLat, mLon], markerStylePorGeocoding(row, color)).bindPopup(`
         <strong>${escapeHtml(row.nome_fantasia || row.razao_social || 'Empresa')}</strong><br>
         ${geocodingBadge(row)}<br>
         ${escapeHtml(row.descricao_cnae || row.cnae_principal || '')}<br>
@@ -515,17 +530,26 @@
       `);
       marker.on('click', () => abrirDetalhe(row));
       markerLayer.addLayer(marker);
-      bounds.push([markerLat, markerLon]);
-      if (!coordenadaAproximada(row)) boundsConfiaveis.push([markerLat, markerLon]);
+      row._coord_repetida = repeticoes > 1;
+      fitBounds.push([mLat, mLon]);
+      if (!coordenadaAproximada(row)) boundsConfiaveis.push([mLat, mLon]);
     });
 
-    const fitBounds = boundsConfiaveis.length ? boundsConfiaveis : bounds;
-    const coordsUnicas = new Set(fitBounds.map(([lat, lon]) => `${lat.toFixed(5)},${lon.toFixed(5)}`));
+    const aproximadas = comCoordenadas.filter(coordenadaAproximada).length;
+    if (aproximadas) {
+      setStatus(`Concluído — ${dados.length} empresas. ${aproximadas} pontos aproximados aparecem mais transparentes no mapa.`, 'ok');
+    }
+
+    if (!fitBounds.length) {
+      if (lastGeo) map.setView([lastGeo.lat, lastGeo.lon], 12);
+      return;
+    }
+
+    const coordsUnicas = new Set(fitBounds.map(([la, lo]) => `${la.toFixed(5)},${lo.toFixed(5)}`));
     const temConfiaveis = boundsConfiaveis.length > 0;
 
     if (fitBounds.length === 1 || coordsUnicas.size === 1) {
-      const [lat, lon] = fitBounds[0];
-      map.setView([lat, lon], temConfiaveis ? 15 : 12);
+      map.setView(fitBounds[0], temConfiaveis ? 15 : 12);
     } else {
       map.fitBounds(fitBounds, { padding: [28, 28], maxZoom: temConfiaveis ? 15 : 12 });
     }
@@ -537,21 +561,27 @@
 
     let lat = Number(empresa.latitude);
     let lon = Number(empresa.longitude);
+    const precisaRefinar = empresa._coord_repetida === true;
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      setStatus('Localizando endereço da empresa...');
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || precisaRefinar) {
+      setStatus(precisaRefinar ? 'Refinando localização pelo endereço da empresa...' : 'Localizando endereço da empresa...');
       const ponto = await geocodeEmpresa(empresa);
-      if (!ponto) {
+      if (!ponto && (!Number.isFinite(lat) || !Number.isFinite(lon))) {
         setStatus('Não foi possível localizar o endereço desta empresa.', 'err');
         return;
       }
-      lat = ponto.lat;
-      lon = ponto.lon;
-      empresa.latitude = lat;
-      empresa.longitude = lon;
-      empresa.geocoding_nivel = 'temporario';
-      empresa.geocoding_origem = 'nominatim_frontend';
-      setStatus('Endereço localizado no mapa. Rode a geocodificação no ETL para salvar definitivo.', 'ok');
+      if (ponto) {
+        lat = ponto.lat;
+        lon = ponto.lon;
+        empresa.latitude = lat;
+        empresa.longitude = lon;
+        empresa.geocoding_nivel = 'temporario';
+        empresa.geocoding_origem = 'nominatim_frontend';
+        empresa._coord_repetida = false;
+        setStatus('Endereço localizado no mapa. Rode a geocodificação no ETL para salvar definitivo.', 'ok');
+      } else {
+        setStatus('Usei a coordenada salva, mas ela parece aproximada/repetida.', 'idle');
+      }
     }
 
     mapFocusLocked = true;
@@ -789,4 +819,3 @@
     sortBy
   });
 })();
-
