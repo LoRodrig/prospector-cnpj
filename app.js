@@ -255,16 +255,17 @@
       return [];
     }
 
-    return (data || []).filter(row =>
+    const filtrados = (data || []).filter(row =>
       normalizarCidade(row.cidade) === normalizarCidade(cidade) &&
       String(row.uf || '').trim().toUpperCase() === String(uf || '').trim().toUpperCase()
     );
+    return enriquecerGeocoding(filtrados);
   }
 
   async function buscarPorCidade(cidade, uf, cnae, limite) {
     let query = dbClient
       .from('empresas')
-      .select('cnpj,razao_social,nome_fantasia,cnae_principal,descricao_cnae,cidade,uf,bairro,logradouro,numero,cep,telefone,email,latitude,longitude')
+      .select('cnpj,razao_social,nome_fantasia,cnae_principal,descricao_cnae,cidade,uf,bairro,logradouro,numero,cep,telefone,email,latitude,longitude,geocoding_nivel,geocoding_origem')
       .eq('cidade', normalizarCidade(cidade))
       .eq('uf', uf)
       .limit(limite);
@@ -278,6 +279,20 @@
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return (data || []).map(row => ({ ...row, distancia_km: null }));
+  }
+
+  async function enriquecerGeocoding(dados) {
+    const cnpjs = [...new Set(dados.map(row => row.cnpj).filter(Boolean))];
+    if (!cnpjs.length) return dados;
+
+    const { data, error } = await dbClient
+      .from('empresas')
+      .select('cnpj,geocoding_nivel,geocoding_origem')
+      .in('cnpj', cnpjs);
+
+    if (error || !data) return dados;
+    const mapa = new Map(data.map(row => [row.cnpj, row]));
+    return dados.map(row => ({ ...row, ...(mapa.get(row.cnpj) || {}) }));
   }
 
   /* â”€â”€â”€ SORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -367,6 +382,49 @@
     return CNAE_COLORS[idx >= 0 ? idx % CNAE_COLORS.length : CNAE_COLORS.length - 1];
   }
 
+  function geocodingInfo(row) {
+    const nivel = String(row.geocoding_nivel || '').toLowerCase();
+    const labels = {
+      exato: 'Exato',
+      mesmo_endereco: 'Mesmo endereço',
+      cep: 'Aproximado por CEP',
+      bairro: 'Aproximado por bairro',
+      cidade: 'Centro da cidade',
+      legado: 'Geocodificado'
+    };
+    const classes = {
+      exato: 'geo-exato',
+      mesmo_endereco: 'geo-endereco',
+      cep: 'geo-cep',
+      bairro: 'geo-bairro',
+      cidade: 'geo-cidade',
+      legado: 'geo-legado'
+    };
+    return {
+      nivel: nivel || 'desconhecido',
+      label: labels[nivel] || 'Sem classificação',
+      classe: classes[nivel] || 'geo-desconhecido',
+      origem: row.geocoding_origem || ''
+    };
+  }
+
+  function geocodingBadge(row) {
+    const info = geocodingInfo(row);
+    return `<span class="geo-badge ${info.classe}" title="${escapeHtml(info.origem)}">${escapeHtml(info.label)}</span>`;
+  }
+
+  function markerStylePorGeocoding(row, color) {
+    const nivel = String(row.geocoding_nivel || '').toLowerCase();
+    const aproximado = ['cep', 'bairro', 'cidade'].includes(nivel);
+    return {
+      radius: aproximado ? 5 : 6,
+      color: aproximado ? '#e2e8f0' : color,
+      fillColor: color,
+      fillOpacity: aproximado ? .45 : .82,
+      weight: aproximado ? 2 : 1
+    };
+  }
+
   function atualizarInsights(dados) {
     atualizarGraficoCnae(dados);
     atualizarMapa(dados);
@@ -408,14 +466,9 @@
       const lat = Number(row.latitude);
       const lon = Number(row.longitude);
       const color = colorForCnae(getCnaeKey(row), top);
-      const marker = L.circleMarker([lat, lon], {
-        radius: 6,
-        color,
-        fillColor: color,
-        fillOpacity: .82,
-        weight: 1
-      }).bindPopup(`
+      const marker = L.circleMarker([lat, lon], markerStylePorGeocoding(row, color)).bindPopup(`
         <strong>${escapeHtml(row.nome_fantasia || row.razao_social || 'Empresa')}</strong><br>
+        ${geocodingBadge(row)}<br>
         ${escapeHtml(row.descricao_cnae || row.cnae_principal || '')}<br>
         ${escapeHtml(row.logradouro || '')}, ${escapeHtml(row.numero || '')}<br>
         ${escapeHtml(row.bairro || '')} - ${escapeHtml(row.cidade || '')}
@@ -459,6 +512,7 @@
       weight: 3
     }).bindPopup(`
       <strong>${escapeHtml(empresa.nome_fantasia || empresa.razao_social || 'Empresa')}</strong><br>
+      ${geocodingBadge(empresa)}<br>
       ${escapeHtml(empresa.descricao_cnae || empresa.cnae_principal || '')}<br>
       ${escapeHtml(empresa.logradouro || '')}, ${escapeHtml(empresa.numero || '')}<br>
       ${escapeHtml(empresa.bairro || '')} - ${escapeHtml(empresa.cidade || '')}
@@ -516,7 +570,7 @@
 
     const cols = ['cnpj','razao_social','nome_fantasia','cnae_principal','descricao_cnae',
                   'cidade','uf','bairro','logradouro','numero','cep','telefone','email',
-                  'latitude','longitude','distancia_km'];
+                  'latitude','longitude','geocoding_nivel','geocoding_origem','distancia_km'];
 
     const rows = [
       cols.join(';'),
@@ -555,6 +609,7 @@
     const osmUrl = hasCoords
       ? `https://www.openstreetmap.org/?mlat=${empresa.latitude}&mlon=${empresa.longitude}#map=18/${empresa.latitude}/${empresa.longitude}`
       : `https://www.openstreetmap.org/search?query=${encodeURIComponent(endereco)}`;
+    const geoInfo = geocodingInfo(empresa);
 
     body.innerHTML = `
       <div>
@@ -581,6 +636,10 @@
         <div class="detail-item">
           <span class="detail-label">Distância</span>
           <span class="detail-value">${empresa.distancia_km != null ? `${empresa.distancia_km} km` : 'Sem cálculo por raio'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Precisão no mapa</span>
+          <span class="detail-value">${geocodingBadge(empresa)}${geoInfo.origem ? `<br>${escapeHtml(geoInfo.origem)}` : ''}</span>
         </div>
       </div>
       <div class="detail-actions">
