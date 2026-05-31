@@ -429,13 +429,16 @@
     return ['cep', 'bairro', 'cidade', 'temporario'].includes(nivel);
   }
 
-  function coordenadaVisual(row, lat, lon) {
-    if (!coordenadaAproximada(row)) return [lat, lon];
+  function coordenadaVisual(row, lat, lon, repeticoes = 1) {
+    if (!coordenadaAproximada(row) && repeticoes <= 1) return [lat, lon];
     const chave = String(row.cnpj || row.razao_social || `${lat},${lon}`);
     let hash = 0;
     for (let i = 0; i < chave.length; i++) hash = ((hash << 5) - hash + chave.charCodeAt(i)) | 0;
     const angulo = (Math.abs(hash) % 360) * Math.PI / 180;
-    const raio = 0.00025 + ((Math.abs(hash) % 7) * 0.00008);
+    const raioBase = coordenadaAproximada(row) ? 0.0009 : 0.00045;
+    const raioExtra = (Math.abs(hash) % 13) * 0.00016;
+    const raioCluster = Math.min(repeticoes, 80) * 0.000025;
+    const raio = Math.min(0.006, raioBase + raioExtra + raioCluster);
     return [lat + Math.sin(angulo) * raio, lon + Math.cos(angulo) * raio];
   }
 
@@ -488,12 +491,20 @@
       return;
     }
 
+    const repeticoesPorCoordenada = new Map();
+    comCoordenadas.forEach(row => {
+      const chave = `${Number(row.latitude).toFixed(5)},${Number(row.longitude).toFixed(5)}`;
+      repeticoesPorCoordenada.set(chave, (repeticoesPorCoordenada.get(chave) || 0) + 1);
+    });
+
     const bounds = [];
     const boundsConfiaveis = [];
     comCoordenadas.forEach(row => {
       const lat = Number(row.latitude);
       const lon = Number(row.longitude);
-      const [markerLat, markerLon] = coordenadaVisual(row, lat, lon);
+      const chave = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+      const repeticoes = repeticoesPorCoordenada.get(chave) || 1;
+      const [markerLat, markerLon] = coordenadaVisual(row, lat, lon, repeticoes);
       const color = colorForCnae(getCnaeKey(row), top);
       const marker = L.circleMarker([markerLat, markerLon], markerStylePorGeocoding(row, color)).bindPopup(`
         <strong>${escapeHtml(row.nome_fantasia || row.razao_social || 'Empresa')}</strong><br>
