@@ -25,6 +25,7 @@
   let selectedLayer;
   let cnaeChart;
   let lastGeo = null;
+  let mapFocusLocked = false;
   let cnaeCatalog = [];
   const CNAE_COLORS = ['#38bdf8','#22c55e','#f59e0b','#f472b6','#a78bfa','#fb7185','#14b8a6','#eab308','#60a5fa','#f97316'];
 
@@ -137,6 +138,8 @@
     }
 
     document.getElementById('btnBuscar').disabled = true;
+    mapFocusLocked = false;
+    selectedLayer?.clearLayers();
     setStatus('Consultando empresas por cidade…');
 
     try {
@@ -318,20 +321,20 @@
 
     tbody.innerHTML = slice.map(r => `
       <tr onclick="focarEmpresa('${String(r.cnpj || '').replace(/\D/g, '')}')">
-        <td title="${r.cnpj}">${fmtCNPJ(r.cnpj)}</td>
-        <td title="${r.razao_social || ''}">${r.razao_social || '—'}</td>
-        <td title="${r.nome_fantasia || ''}">${r.nome_fantasia || '—'}</td>
-        <td>${r.cnae_principal || '—'}</td>
-        <td title="${r.descricao_cnae || ''}">${r.descricao_cnae || '—'}</td>
-        <td>${r.cidade || '—'}</td>
-        <td>${r.uf || '—'}</td>
-        <td>${r.telefone
+        <td data-label="CNPJ" title="${r.cnpj}">${fmtCNPJ(r.cnpj)}</td>
+        <td data-label="Razão social" title="${r.razao_social || ''}">${r.razao_social || '—'}</td>
+        <td data-label="Fantasia" title="${r.nome_fantasia || ''}">${r.nome_fantasia || '—'}</td>
+        <td data-label="CNAE">${r.cnae_principal || '—'}</td>
+        <td data-label="Atividade" title="${r.descricao_cnae || ''}">${r.descricao_cnae || '—'}</td>
+        <td data-label="Cidade">${r.cidade || '—'}</td>
+        <td data-label="UF">${r.uf || '—'}</td>
+        <td data-label="Telefone">${r.telefone
           ? `<span class="badge badge-phone">${r.telefone}</span>`
           : `<span class="badge badge-none">—</span>`}</td>
-        <td title="${r.email || ''}">${r.email
+        <td data-label="E-mail" title="${r.email || ''}">${r.email
           ? `<span class="badge badge-email">${r.email}</span>`
           : `<span class="badge badge-none">—</span>`}</td>
-        <td>${r.distancia_km != null ? `<span class="dist-pill">${r.distancia_km} km</span>` : '—'}</td>
+        <td data-label="Mapa">${r.distancia_km != null ? `<span class="dist-pill">${r.distancia_km} km</span>` : ''}${geocodingBadge(r)}</td>
       </tr>
     `).join('');
   }
@@ -390,6 +393,7 @@
       cep: 'Aproximado por CEP',
       bairro: 'Aproximado por bairro',
       cidade: 'Centro da cidade',
+      temporario: 'Localização aproximada',
       legado: 'Geocodificado'
     };
     const classes = {
@@ -398,6 +402,7 @@
       cep: 'geo-cep',
       bairro: 'geo-bairro',
       cidade: 'geo-cidade',
+      temporario: 'geo-cidade',
       legado: 'geo-legado'
     };
     return {
@@ -415,7 +420,7 @@
 
   function markerStylePorGeocoding(row, color) {
     const nivel = String(row.geocoding_nivel || '').toLowerCase();
-    const aproximado = ['cep', 'bairro', 'cidade'].includes(nivel);
+    const aproximado = ['cep', 'bairro', 'cidade', 'temporario'].includes(nivel);
     return {
       radius: aproximado ? 5 : 6,
       color: aproximado ? '#e2e8f0' : color,
@@ -455,6 +460,8 @@
         ${escapeHtml(item.label.length > 20 ? item.label.slice(0, 20) + '...' : item.label)}
       </span>
     `).join('');
+
+    if (mapFocusLocked) return;
 
     if (!comCoordenadas.length) {
       if (lastGeo) map.setView([lastGeo.lat, lastGeo.lon], 12);
@@ -500,9 +507,12 @@
       lon = ponto.lon;
       empresa.latitude = lat;
       empresa.longitude = lon;
+      empresa.geocoding_nivel = 'temporario';
+      empresa.geocoding_origem = 'nominatim_frontend';
       setStatus('Endereço localizado no mapa. Rode a geocodificação no ETL para salvar definitivo.', 'ok');
     }
 
+    mapFocusLocked = true;
     selectedLayer.clearLayers();
     const marker = L.circleMarker([lat, lon], {
       radius: 11,
@@ -713,6 +723,8 @@
   /* â”€â”€â”€ LIMPAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   function limpar() {
     allData = filteredData = [];
+    mapFocusLocked = false;
+    selectedLayer?.clearLayers();
     document.getElementById('tbody').innerHTML =
       `<tr class="empty-row"><td colspan="10">Faça uma busca para visualizar os resultados.</td></tr>`;
     document.getElementById('paginacao').innerHTML = '';

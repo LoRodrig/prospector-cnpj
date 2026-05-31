@@ -827,10 +827,18 @@
       header {
         padding-top: 24px;
         flex-wrap: wrap;
+        gap: 12px;
       }
 
       header h1 {
-        font-size: clamp(34px, 13vw, 46px);
+        font-size: clamp(22px, 8vw, 34px);
+        white-space: nowrap;
+      }
+
+      .logo-eyebrow {
+        font-size: 8px;
+        line-height: 1.5;
+        letter-spacing: .12em;
       }
 
       .header-meta {
@@ -863,6 +871,71 @@
         width: 100%;
       }
 
+      .table-wrapper {
+        overflow-x: visible;
+      }
+
+      table,
+      tbody,
+      tr,
+      td {
+        display: block;
+        width: 100%;
+      }
+
+      table {
+        min-width: 0;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tbody {
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+      }
+
+      tbody tr {
+        border: 1px solid rgba(56,189,248,.12);
+        border-radius: 12px;
+        background: rgba(255,255,255,.025);
+        overflow: hidden;
+      }
+
+      tbody td {
+        display: grid;
+        grid-template-columns: 104px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        max-width: none;
+        padding: 8px 10px;
+        border-top: 1px solid rgba(148,163,184,.07);
+        white-space: normal !important;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+      }
+
+      tbody td:first-child {
+        border-top: 0;
+      }
+
+      tbody td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-family: 'DM Mono', monospace;
+        font-size: 9px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      th:nth-child(3), td:nth-child(3),
+      th:nth-child(7), td:nth-child(7) {
+        display: none;
+      }
+
       #map {
         height: 300px;
       }
@@ -873,6 +946,15 @@
     }
 
     @media(max-width: 480px) {
+      .wrap {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      header h1 {
+        font-size: clamp(20px, 7.4vw, 30px);
+      }
+
       .form-grid,
       .kpi-row {
         grid-template-columns: 1fr;
@@ -889,7 +971,8 @@
         text-align: center;
       }
 
-      table {
-        min-width: 720px;
+      tbody td {
+        grid-template-columns: 92px minmax(0, 1fr);
+        font-size: 11px;
       }
     }
