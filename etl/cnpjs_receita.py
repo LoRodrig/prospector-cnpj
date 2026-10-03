@@ -30,7 +30,7 @@ WEBDAV_PROPFIND = """<?xml version="1.0" encoding="utf-8"?>
 </propfind>"""
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; cnpj-receita-etl/1.0)"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 }
 
 REQUEST_TIMEOUT = (10, 60)
@@ -286,26 +286,35 @@ def baixar_html(url):
 
 
 def webdav_listar(url, depth="1"):
-    try:
-        response = requests.request(
-            "PROPFIND",
-            url,
-            headers={
-                "Depth": depth,
-                "Content-Type": "application/xml",
-                **HEADERS,
-            },
-            data=WEBDAV_PROPFIND,
-            auth=(RF_SHARE_TOKEN, ""),
-            timeout=REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
-    except requests.RequestException as erro:
+    ultimo_erro = None
+    for tentativa in range(1, 6):
+        try:
+            response = requests.request(
+                "PROPFIND",
+                url,
+                headers={
+                    "Depth": depth,
+                    "Content-Type": "application/xml",
+                    **HEADERS,
+                },
+                data=WEBDAV_PROPFIND,
+                auth=(RF_SHARE_TOKEN, ""),
+                timeout=REQUEST_TIMEOUT,
+            )
+            response.raise_for_status()
+            break
+        except requests.RequestException as erro:
+            ultimo_erro = erro
+            if tentativa < 5:
+                espera = 15 * tentativa
+                print(f"WebDAV falhou ({erro}); nova tentativa em {espera}s ({tentativa}/5)...")
+                time.sleep(espera)
+    else:
         raise RuntimeError(
             "Nao foi possivel consultar o WebDAV da Receita.\n"
             f"URL: {url}\n"
-            f"Erro: {erro}"
-        ) from erro
+            f"Erro: {ultimo_erro}"
+        ) from ultimo_erro
 
     try:
         tree = ET.fromstring(response.content)
