@@ -8,7 +8,7 @@
       --text:      #e2e8f0;
       --text-dim:  #94a3b8;
       --danger:    #f87171;
-      --page-max:  1180px;
+      --page-max:  1680px;
       --page-pad:  clamp(12px, 2vw, 22px);
       --panel-pad: clamp(18px, 2.2vw, 28px);
     }
@@ -78,13 +78,15 @@
     header h1 {
       font-size: clamp(34px, 4.8vw, 62px);
       font-weight: 800;
-      line-height: 1;
+      line-height: 1.2;
+      padding: 0 .08em .08em 0;
       background: linear-gradient(100deg, #e2e8f0 0%, #38bdf8 55%, #22c55e 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       letter-spacing: -.02em;
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
 
     .header-meta {
@@ -798,7 +800,7 @@
     /* â”€â”€ RESPONSIVE â”€â”€ */
     @media(max-width: 1400px) {
       :root {
-        --page-max: 1160px;
+        --page-max: 1440px;
         --panel-pad: 22px;
       }
 
@@ -825,7 +827,7 @@
 
     @media(max-width: 1000px) {
       :root {
-        --page-max: 820px;
+        --page-max: 960px;
         --panel-pad: 18px;
       }
 
@@ -881,7 +883,7 @@
 
       header h1 {
         font-size: clamp(22px, 8vw, 34px);
-        white-space: nowrap;
+        white-space: normal;
       }
 
       .logo-eyebrow {
